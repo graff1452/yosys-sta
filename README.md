@@ -1,95 +1,95 @@
 # yosys-sta
 
-使用开源EDA工具进行ASIC综合, 时序分析和功耗分析, 用于了解前端RTL设计的PPA并快速迭代.
-用到的开源EDA工具包括:
-* 开源综合器Yosys
-* iEDA团队自研的开源EDA工具集, 这些工具会被编译成一个二进制文件`iEDA`, 本项目中用到的子工具包括
-  * 静态时序分析(STA)工具iSTA
-  * 功耗分析工具iPA
+Personal fork of [OSCPU/yosys-sta](https://github.com/OSCPU/yosys-sta) — an
+ASIC synthesis/timing/power evaluation pipeline built on the open-source synthesizer
+[Yosys](https://github.com/YosysHQ/yosys) and NJU's [iEDA](https://github.com/OSCC-Project/iEDA)
+toolset (static timing analysis via iSTA, power analysis via iPA).
 
-* 根据iEDA团队的介绍, iSTA有以下优势
-  1. 通过TCL命令操作, 使用简单, 能满足常用的时序分析需求
-  1. 开源协议限制少: 相对地, OpenRoad项目的OpenSTA项目由于开源协议限制，不能随意修改和发布
-  1. 代码结构清晰, 可修改和扩展性强: 团队将持续迭代更新, 以更好支撑开源芯片设计
-* iSTA的一些参考资源:
-  * [iSTA的源代码](https://github.com/OSCC-Project/iEDA/tree/master/src/operation/iSTA)
-  * iSTA的报告解读可参考[这个视频](https://www.bilibili.com/video/BV1a14y1B7uz/?t=1006)
-  * iSTA的内部技术可参考[第一期iEDA Tutorial](https://www.bilibili.com/video/BV1a14y1B7uz)
-* iEDA团队的完整工作可参考以下文章
-  * [Xingquan Li, Simin Tao, Zengrong Huang, et al. An Open-Source Intelligent Physical Implementation Toolkit and Library[C]. International Symposium of EDA, 2023.](https://github.com/OSCC-Project/iEDA/blob/master/docs/paper/ISEDA'23-iEDA-final.pdf)
-* 目前支持开源PDK icsprout55, 具体可在安装依赖(见下文)后阅读icsprout55的README
+Used here to turn RTL (from [OSOC](https://github.com/graff1452/OSOC)'s `npc/` designs)
+into a real, manufacturable gate-level netlist, and to get a first, logic-delay-only
+estimate of a circuit's maximum clock frequency and power consumption.
 
-## 安装依赖
+## Setup
 
-安装yosys, 版本要求不低于0.48. 建议从[这个链接][oss-cad-suite]下载相应的工具包.
-解压缩后, 将`path-to-oss-cad-suite/bin`加入到环境变量`PATH`中, 即可调用工具包中的yosys.
-
-[oss-cad-suite]: https://github.com/YosysHQ/oss-cad-suite-build/releases
-
-安装其他依赖并下载组件:
-```shell
-apt install libunwind-dev liblzma-dev # iEDA的依赖库
-# or
-yum install libunwind liblzma
-make init # 下载预编译的iEDA和icsprout55工艺库
-```
-完成后, 测试iEDA能否运行:
-```
-echo exit | ./bin/iEDA -v  # 若运行成功, 终端将输出iEDA的版本号
+**1. Install Yosys ≥ 0.48** via the prebuilt [oss-cad-suite](https://github.com/YosysHQ/oss-cad-suite-build/releases)
+(not apt — too old a version there):
+```bash
+# download the release matching your architecture (check with `uname -m`), then:
+tar -xzf oss-cad-suite-linux-*.tgz -C ~/Desktop
+echo 'export PATH=$PATH:'"$HOME"'/Desktop/oss-cad-suite/bin' >> ~/.bashrc
+source ~/.bashrc
+yosys --version
 ```
 
-若依赖库版本不一致, 或使用其他架构(如ARM), 建议自行构建iEDA:
+**2. Install remaining dependencies, fetch prebuilt iEDA + the PDKs**
+```bash
+sudo apt-get install libunwind-dev liblzma-dev
+make init
+echo exit | ./bin/iEDA -v   # should print a version hash
 ```
-git submodule update --init --recursive
-cd iEDA
-vim README.md  # 请参考iEDA项目的README中的操作进行构建
-```
 
-## 评估样例设计
+## Running synthesis + timing/power analysis
 
-项目包含一个样例设计GCD, 可通过以下命令进行综合, 并评估其在icsprout55工艺上的时序表现.
-
-```shell
+Built-in example (GCD circuit), full pipeline:
+```bash
 make sta
 ```
+Results land in `result/<design>-<freq>MHz/` — `<design>.netlist.v` is the actual
+synthesized netlist; `.rpt`/`.cap`/`.fanout`/`.trans`/`.skew` are iSTA timing reports;
+`.pwr`/`_instance.pwr` are iPA power reports. `result/` is gitignored (regenerated
+output, not source).
 
-运行后, 可在`result/gcd-500MHz/`目录下查看评估结果. 部分文件说明如下:
-* `gcd.netlist.v` - Yosys综合的网表文件
-* `gcd.netlist.v.sim` - Yosys综合的网表文件, 用于网表仿真
-* `synth_stat.txt` - Yosys综合的面积报告
-* `synth_check.txt` - Yosys综合的检查报告, 用户需仔细阅读并决定是否需要排除相应警告
-* `yosys.log` - Yosys综合的完整日志
-* `gcd.rpt` - iSTA的时序分析报告, 包含WNS, TNS和时序路径
-* `gcd.cap` - iSTA的电容违例报告
-* `gcd.fanout` - iSTA的扇出违例报告
-* `gcd.trans` - iSTA的转换时间违例报告
-* `gcd_hold.skew` - iSTA的hold模式下时钟偏斜报告
-* `gcd_setup.skew` - iSTA的setup模式下时钟偏斜报告
-* `gcd.pwr` - iSTA的总体功耗报告
-* `gcd_instance.pwr` - iSTA的标准单元级别功耗报告
-* `gcd_instance.csv` - iSTA的标准单元级别功耗报告, CSV格式
-* `sta.log` - iSTA的日志
+Synthesis only (no timing/power), on your own design:
+```bash
+make syn DESIGN=<top_module_name> RTL_FILES=/path/to/your.v \
+  CLK_PORT_NAME=clk CLK_FREQ_MHZ=500
+```
+`DESIGN` must match the actual Verilog `module` name, not the filename.
 
-## 评估其他设计
+## `counter-test/` — manual, step-by-step synthesis walkthrough
 
-有两种操作方式：
-1. 命令行传参方式, 在命令行中指定其他设计的信息
-   ```shell
-   make -C /path/to/this_repo sta \
-       DESIGN=mydesign SDC_FILE=/path/to/my.sdc \
-       CLK_FREQ_MHZ=100 CLK_PORT_NAME=clk O=/path/to/pwd \
-       RTL_FILES="/path/to/mydesign.v /path/to/xxx.v ..."
-   ```
-1. 修改变量方式, 在`Makefile`中修改上述变量, 然后运行`make sta`
+`counter.v` (a simple 2-bit up-counter with sync reset/enable) and a tiny hand-written
+`cell.lib` (5 cells: BUF, NOT, NAND, NOR, DFF — deliberately minimal, no delay/power
+data, not usable for real STA) — used to walk through every synthesis stage manually,
+one Yosys command at a time, watching the circuit's internal structure change at each
+step via `show`:
 
-注意:
-* 在`RTL_FILES`的文件中必须包含一个名为`DESIGN`的module
-* sdc文件中的时钟端口名称需要与设计文件保持一致, 具体内容可参考样例设计GCD中的相应文件
+```bash
+cd counter-test
+yosys counter.v
+```
+```
+hierarchy -check -top counter    # elaboration: parse -> real module
+proc                              # procedural (always block) -> $mux/$dff cells
+opt                                # coarse-grain optimization (merges into $sdffe)
+techmap                           # coarse-grain -> gate-level primitives ($_XOR_, $_NOT_, ...)
+splitnets -ports                  # multi-bit signals -> individual 1-bit wires
+opt -full
+read_liberty -lib cell.lib         # needed before dfflibmap/show for correct pin display
+dfflibmap -liberty cell.lib        # map flip-flops to the real DFF cell (adds MUX logic
+                                    # for enable/reset, since this tiny DFF has neither)
+abc -liberty cell.lib              # map remaining gates to NAND/NOR/NOT (only gates
+                                    # this library provides -- everything else gets
+                                    # reconstructed from these, since NAND/NOR are
+                                    # individually "universal" gates)
+clean
+show                                # view the diagram after each step above
+```
 
-## Bug报告
+Worth noting from this walkthrough: the `+1` increment logic (`count + 1`) synthesized
+down to just one XOR gate and one NOT gate, not a general adder — Yosys recognized that
+incrementing by exactly 1 has a simpler bit-pattern (bit0 always flips; bit1 flips only
+when bit0 was 1) than general addition needs.
 
-如果在运行时遇到bug, 可在issue中报告问题, 并提供如下信息:
-1. 相应的RTL设计
-1. sdc文件
-1. yosys生成的网表文件
-1. iEDA的版本号
+## Running my own designs from `OSOC`
+
+```bash
+make syn DESIGN=top \
+  RTL_FILES=~/Desktop/OSOC/ysyx-workbench/npc/nvboard-light/vsrc/top.v \
+  CLK_PORT_NAME=clk CLK_FREQ_MHZ=500
+```
+Synthesized the running-light circuit (16-bit `led` + 32-bit `count` registers) to
+**190 cells / 566.72 area units** on `icsprout55`, of which **48 are real flip-flops**
+(295.68 area, 52% of the total) — matching exactly the 16+32=48 bits of state declared
+in the Verilog, a good sanity check that synthesis preserved the design's state
+faithfully.
