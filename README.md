@@ -135,3 +135,17 @@ facts worth remembering:
   `OAI22_X1` = `!((A1|A2)&(B1|B2))` and `AOI221_X1` = `!(((C1&C2)|A)|(B1&B2))`,
   matching the "OR/AND groups sized by the trailing digits, then invert" pattern
   exactly.
+
+## sCPU synthesis
+
+[sCPU](https://github.com/graff1452/OSOC) — the sISA processor built in
+`OSOC/ysyx-workbench/npc/scpu-rtl/` — synthesizes with **0 warnings** and **36
+flip-flops** (exactly matching its 36 bits of declared state: 4×8-bit registers + a
+4-bit PC), 658.84 total area units on `icsprout55`. Multi-file `RTL_FILES`:
+
+```bash
+make sta DESIGN=scpu \
+  RTL_FILES="<path>/vsrc/templates.v <path>/vsrc/regfile.v <path>/vsrc/imem.v \
+             <path>/vsrc/decoder.v <path>/vsrc/alu.v <path>/vsrc/pc_reg.v <path>/vsrc/scpu.v" \
+  CLK_PORT_NAME=clk CLK_FREQ_MHZ=500
+```
