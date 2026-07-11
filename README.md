@@ -93,3 +93,25 @@ Synthesized the running-light circuit (16-bit `led` + 32-bit `count` registers) 
 (295.68 area, 52% of the total) — matching exactly the 16+32=48 bits of state declared
 in the Verilog, a good sanity check that synthesis preserved the design's state
 faithfully.
+
+### Timing + power (`make sta`)
+
+```bash
+make sta DESIGN=top \
+  RTL_FILES=~/Desktop/OSOC/ysyx-workbench/npc/nvboard-light/vsrc/top.v \
+  CLK_PORT_NAME=clk CLK_FREQ_MHZ=500
+```
+
+**Timing** (`result/top-500MHz/top.rpt`): all paths report `slack (MET)` at the
+requested 500MHz — comfortably, in fact. The worst (critical) path has a logic delay of
+only `0.424ns` against a `1.973ns` budget, meaning this specific circuit could
+theoretically run as fast as **~2218MHz** based on logic delay alone (reported directly
+in the `Freq(MHz)` column). `path net delay` is `0.000` on every path, since this flow
+does no physical placement/routing — every nanosecond shown is pure gate delay, not
+wire delay, so this is an optimistic upper bound, not a tape-out-accurate number.
+
+**Power** (`result/top-500MHz/top.pwr`): total **5.119e-04 W** (~0.5mW). Combinational
+logic draws 74% of total power despite being only ~48% of the *area* (flip-flops are
+the reverse: 52% of area, only 26% of power) — area and power don't scale together.
+Switch power reports as `0.000` throughout, again because it requires real interconnect
+capacitance from physical routing, which this flow doesn't perform.
