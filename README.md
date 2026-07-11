@@ -115,3 +115,23 @@ logic draws 74% of total power despite being only ~48% of the *area* (flip-flops
 the reverse: 52% of area, only 26% of power) — area and power don't scale together.
 Switch power reports as `0.000` throughout, again because it requires real interconnect
 capacitance from physical routing, which this flow doesn't perform.
+
+## PDK notes (`nangate45`)
+
+Poking through the PDK's actual files (`pdk/nangate45/{lef,lib,cdl}/`), a few concrete
+facts worth remembering:
+
+- **10 metal layers** (`lef/Nangate45_tech.lef`), grouped by width into three tiers
+  matching the standard low/medium/high classification: metal1–3 (0.07µm, dense,
+  standard-cell-internal wiring), metal4–6 (0.14µm, cell-to-cell interconnect),
+  metal7–10 (0.40–0.80µm, clock/power distribution).
+- **Drive strength costs power roughly linearly, area sub-linearly**: `NAND2_X1` →
+  `X2` → `X4` leakage power scales almost exactly 1×/2×/4×, but area only scales
+  1×/1.67×/3× — stronger cells are proportionally cheaper in area than in power.
+- **Flip-flops are expensive**: `NAND2_X1` = 4 transistors; `DFF_X1` = 28 transistors
+  (7×), confirming numerically why the running-light module's 48 flip-flops dominated
+  its total synthesized area despite being a minority of the cell count.
+- Complex-gate naming is a real decodable convention, not arbitrary — confirmed
+  `OAI22_X1` = `!((A1|A2)&(B1|B2))` and `AOI221_X1` = `!(((C1&C2)|A)|(B1&B2))`,
+  matching the "OR/AND groups sized by the trailing digits, then invert" pattern
+  exactly.
